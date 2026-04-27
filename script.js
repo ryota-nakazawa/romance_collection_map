@@ -11,6 +11,7 @@ const relationType = document.querySelector("#relationType");
 const relationLabel = document.querySelector("#relationLabel");
 const addRelationButton = document.querySelector("#addRelationButton");
 const exportPngButton = document.querySelector("#exportPngButton");
+const exportResult = document.querySelector("#exportResult");
 const resetButton = document.querySelector("#resetButton");
 const personCount = document.querySelector("#personCount");
 const relationCount = document.querySelector("#relationCount");
@@ -29,6 +30,7 @@ const samplePalette = ["#ee4c8b", "#005bac", "#ff705d", "#1aa6b7", "#f7b731", "#
 let people = [];
 let relations = [];
 let dragState = null;
+let latestExportUrl = null;
 
 function uid(prefix) {
   return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
@@ -415,6 +417,8 @@ function exportPng() {
     statusChip.textContent = "先に人物を追加してください";
     return;
   }
+  exportPngButton.disabled = true;
+  exportPngButton.textContent = "PNG生成中...";
   const markup = exportSvgMarkup();
   const rect = canvasRect();
   const image = new Image();
@@ -428,17 +432,56 @@ function exportPng() {
     context.scale(2, 2);
     context.drawImage(image, 0, 0);
     URL.revokeObjectURL(url);
-    const link = document.createElement("a");
-    link.download = "romance-correlation-map.png";
-    link.href = exportCanvas.toDataURL("image/png");
-    link.click();
+    exportCanvas.toBlob((blob) => {
+      if (!blob) {
+        statusChip.textContent = "PNG生成に失敗しました";
+        exportPngButton.disabled = false;
+        exportPngButton.textContent = "PNGを書き出す";
+        return;
+      }
+      if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
+      latestExportUrl = URL.createObjectURL(blob);
+      showExportResult(latestExportUrl);
+      triggerDownload(latestExportUrl);
+      statusChip.textContent = "PNGを生成しました";
+      exportPngButton.disabled = false;
+      exportPngButton.textContent = "PNGを書き出す";
+    }, "image/png");
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    statusChip.textContent = "PNG生成に失敗しました";
+    exportPngButton.disabled = false;
+    exportPngButton.textContent = "PNGを書き出す";
   };
   image.src = url;
+}
+
+function showExportResult(url) {
+  exportResult.hidden = false;
+  exportResult.innerHTML = `
+    <img alt="書き出した相関図プレビュー" src="${url}" />
+    <a href="${url}" download="romance-correlation-map.png">生成したPNGを保存</a>
+    <p>自動保存されないブラウザでは、このボタンを右クリックまたは長押しして保存してください。</p>
+  `;
+}
+
+function triggerDownload(url) {
+  const link = document.createElement("a");
+  link.download = "romance-correlation-map.png";
+  link.href = url;
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function resetAll() {
   people = [];
   relations = [];
+  exportResult.hidden = true;
+  exportResult.innerHTML = "";
+  if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
+  latestExportUrl = null;
   render();
 }
 

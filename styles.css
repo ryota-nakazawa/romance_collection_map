@@ -264,6 +264,49 @@ button {
   font-size: 12px;
 }
 
+.export-result {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #f7faff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.export-result[hidden] {
+  display: none;
+}
+
+.export-result img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.export-result a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 12px;
+  color: white;
+  background: var(--pink);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.export-result p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .workspace {
   display: grid;
   grid-template-rows: auto 1fr;
