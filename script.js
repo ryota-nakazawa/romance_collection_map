@@ -31,6 +31,8 @@ let people = [];
 let relations = [];
 let dragState = null;
 let latestExportUrl = null;
+let latestExportBlob = null;
+let latestExportDataUrl = null;
 
 function uid(prefix) {
   return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
@@ -440,9 +442,11 @@ function exportPng() {
         return;
       }
       if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
+      latestExportBlob = blob;
+      latestExportDataUrl = exportCanvas.toDataURL("image/png");
       latestExportUrl = URL.createObjectURL(blob);
-      showExportResult(latestExportUrl);
-      triggerDownload(latestExportUrl);
+      showExportResult();
+      triggerDownload(latestExportDataUrl);
       statusChip.textContent = "PNGを生成しました";
       exportPngButton.disabled = false;
       exportPngButton.textContent = "PNGを書き出す";
@@ -457,13 +461,63 @@ function exportPng() {
   image.src = url;
 }
 
-function showExportResult(url) {
+function showExportResult() {
   exportResult.hidden = false;
-  exportResult.innerHTML = `
-    <img alt="書き出した相関図プレビュー" src="${url}" />
-    <a href="${url}" download="romance-correlation-map.png">生成したPNGを保存</a>
-    <p>自動保存されないブラウザでは、このボタンを右クリックまたは長押しして保存してください。</p>
-  `;
+  exportResult.innerHTML = "";
+
+  const preview = document.createElement("img");
+  preview.alt = "書き出した相関図プレビュー";
+  preview.src = latestExportDataUrl;
+
+  const actions = document.createElement("div");
+  actions.className = "export-actions";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.textContent = "生成したPNGを保存";
+  saveButton.addEventListener("click", savePngFile);
+
+  const openLink = document.createElement("a");
+  openLink.href = latestExportDataUrl;
+  openLink.target = "_blank";
+  openLink.rel = "noopener";
+  openLink.textContent = "画像を別タブで開く";
+
+  const note = document.createElement("p");
+  note.textContent =
+    "保存ボタンが効かないブラウザでは、別タブで開いた画像を右クリックまたは長押しして保存してください。";
+
+  actions.append(saveButton, openLink);
+  exportResult.append(preview, actions, note);
+}
+
+async function savePngFile() {
+  if (!latestExportBlob || !latestExportDataUrl) return;
+
+  if ("showSaveFilePicker" in window) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "romance-correlation-map.png",
+        types: [
+          {
+            description: "PNG image",
+            accept: { "image/png": [".png"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(latestExportBlob);
+      await writable.close();
+      statusChip.textContent = "PNGを保存しました";
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+
+  triggerDownload(latestExportDataUrl);
+  window.open(latestExportDataUrl, "_blank", "noopener");
+  statusChip.textContent = "別タブで開いた画像から保存してください";
 }
 
 function triggerDownload(url) {
@@ -482,6 +536,8 @@ function resetAll() {
   exportResult.innerHTML = "";
   if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
   latestExportUrl = null;
+  latestExportBlob = null;
+  latestExportDataUrl = null;
   render();
 }
 

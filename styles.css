@@ -286,6 +286,12 @@ button {
   border-radius: 6px;
 }
 
+.export-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.export-result button,
 .export-result a {
   display: inline-flex;
   align-items: center;
@@ -294,10 +300,15 @@ button {
   padding: 0 12px;
   color: white;
   background: var(--pink);
+  border: 0;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.export-result a {
+  background: var(--blue-700);
 }
 
 .export-result p {
