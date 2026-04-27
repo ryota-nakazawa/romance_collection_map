@@ -214,6 +214,11 @@ function renderCanvas() {
 }
 
 function relationPath(from, to) {
+  const geometry = relationGeometry(from, to);
+  return { d: `M ${geometry.sx} ${geometry.sy} Q ${geometry.cx} ${geometry.cy} ${geometry.ex} ${geometry.ey}`, labelX: geometry.cx, labelY: geometry.cy };
+}
+
+function relationGeometry(from, to) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.hypot(dx, dy) || 1;
@@ -227,7 +232,7 @@ function relationPath(from, to) {
   const ey = to.y - (dy / distance) * endRadius + offsetY;
   const cx = (sx + ex) / 2 + offsetX * 2;
   const cy = (sy + ey) / 2 + offsetY * 2;
-  return { d: `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`, labelX: cx, labelY: cy };
+  return { sx, sy, ex, ey, cx, cy, dx, dy, distance };
 }
 
 function renderRelationSvg() {
@@ -345,120 +350,207 @@ function render() {
   updateCounts();
 }
 
-function exportSvgMarkup() {
-  const rect = canvasRect();
-  const width = Math.round(rect.width);
-  const height = Math.round(rect.height);
-  const background = `
-    <defs>
-      <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-        <stop offset="0%" stop-color="#ffffff"/>
-        <stop offset="100%" stop-color="#e8f1ff"/>
-      </linearGradient>
-      ${people
-        .map(
-          (person) => `
-            <clipPath id="clip-${person.id}">
-              <circle cx="${person.x}" cy="${person.y - 10}" r="54"/>
-            </clipPath>
-          `,
-        )
-        .join("")}
-      ${relationTypes
-        .map(
-          (type) => `
-            <marker id="export-arrow-${type.id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="${type.color}"></path>
-            </marker>
-          `,
-        )
-        .join("")}
-    </defs>
-    <rect width="100%" height="100%" rx="8" fill="url(#bg)"/>
-    <circle cx="${width * 0.12}" cy="${height * 0.12}" r="${width * 0.18}" fill="rgba(238,76,139,.10)"/>
-    <circle cx="${width * 0.88}" cy="${height * 0.18}" r="${width * 0.16}" fill="rgba(247,183,49,.14)"/>
-    <text x="34" y="52" font-size="26" font-family="Arial, sans-serif" font-weight="800" fill="#071b4d">今日の恋模様</text>
-  `;
-
-  const relationMarkup = relations
-    .map((relation) => {
-      const from = people.find((person) => person.id === relation.from);
-      const to = people.find((person) => person.id === relation.to);
-      const type = relationTypes.find((item) => item.id === relation.type) || relationTypes[0];
-      if (!from || !to || from.id === to.id) return "";
-      const path = relationPath(from, to);
-      return `
-        <path d="${path.d}" fill="none" stroke="${type.color}" stroke-width="5" stroke-linecap="round" marker-end="url(#export-arrow-${type.id})"/>
-        <text x="${path.labelX}" y="${path.labelY - 8}" text-anchor="middle" font-size="15" font-family="Arial, sans-serif" font-weight="800" fill="#071b4d" stroke="#fff" stroke-width="5" paint-order="stroke">${escapeHtml(relation.label || type.label)}</text>
-      `;
-    })
-    .join("");
-
-  const peopleMarkup = people
-    .map(
-      (person) => `
-        <circle cx="${person.x}" cy="${person.y - 10}" r="60" fill="#fff"/>
-        <image href="${person.image}" x="${person.x - 54}" y="${person.y - 64}" width="108" height="108" preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-${person.id})"/>
-        <rect x="${person.x - 58}" y="${person.y + 52}" width="116" height="30" rx="15" fill="#08266d"/>
-        <text x="${person.x}" y="${person.y + 72}" text-anchor="middle" font-size="14" font-family="Arial, sans-serif" font-weight="800" fill="#fff">${escapeHtml(person.name)}</text>
-      `,
-    )
-    .join("");
-
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      ${background}
-      ${relationMarkup}
-      ${peopleMarkup}
-    </svg>
-  `;
-}
-
-function exportPng() {
+async function exportPng() {
   if (people.length === 0) {
     statusChip.textContent = "先に人物を追加してください";
     return;
   }
   exportPngButton.disabled = true;
   exportPngButton.textContent = "PNG生成中...";
-  const markup = exportSvgMarkup();
-  const rect = canvasRect();
-  const image = new Image();
-  const svgBlob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-  image.onload = () => {
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = Math.round(rect.width * 2);
-    exportCanvas.height = Math.round(rect.height * 2);
-    const context = exportCanvas.getContext("2d");
-    context.scale(2, 2);
-    context.drawImage(image, 0, 0);
-    URL.revokeObjectURL(url);
-    exportCanvas.toBlob((blob) => {
-      if (!blob) {
-        statusChip.textContent = "PNG生成に失敗しました";
-        exportPngButton.disabled = false;
-        exportPngButton.textContent = "PNGを書き出す";
-        return;
-      }
-      if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
-      latestExportBlob = blob;
-      latestExportDataUrl = exportCanvas.toDataURL("image/png");
-      latestExportUrl = URL.createObjectURL(blob);
-      showExportResult();
-      triggerDownload(latestExportDataUrl);
-      statusChip.textContent = "PNGを生成しました";
-      exportPngButton.disabled = false;
-      exportPngButton.textContent = "PNGを書き出す";
-    }, "image/png");
-  };
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
+
+  try {
+    const exportCanvas = await drawExportCanvas();
+    const dataUrl = exportCanvas.toDataURL("image/png");
+    const blob = dataUrlToBlob(dataUrl);
+
+    if (!blob.size) {
+      throw new Error("Generated PNG is empty");
+    }
+
+    if (latestExportUrl) URL.revokeObjectURL(latestExportUrl);
+    latestExportBlob = blob;
+    latestExportDataUrl = dataUrl;
+    latestExportUrl = URL.createObjectURL(blob);
+    showExportResult();
+    statusChip.textContent = `PNGを生成しました (${Math.round(blob.size / 1024)}KB)`;
+  } catch (error) {
+    console.error(error);
     statusChip.textContent = "PNG生成に失敗しました";
+  } finally {
     exportPngButton.disabled = false;
     exportPngButton.textContent = "PNGを書き出す";
-  };
-  image.src = url;
+  }
+}
+
+async function drawExportCanvas() {
+  const rect = canvasRect();
+  const width = Math.max(640, Math.round(rect.width));
+  const height = Math.max(480, Math.round(rect.height));
+  const scale = 2;
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = width * scale;
+  exportCanvas.height = height * scale;
+  const context = exportCanvas.getContext("2d");
+  context.scale(scale, scale);
+
+  drawExportBackground(context, width, height);
+  drawExportRelations(context);
+
+  const imageEntries = await Promise.all(
+    people.map(async (person) => ({
+      person,
+      image: await loadImage(person.image),
+    })),
+  );
+  imageEntries.forEach(({ person, image }) => drawExportPerson(context, person, image));
+
+  return exportCanvas;
+}
+
+function drawExportBackground(context, width, height) {
+  const gradient = context.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(1, "#e8f1ff");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = "rgba(238, 76, 139, 0.10)";
+  context.beginPath();
+  context.arc(width * 0.12, height * 0.12, width * 0.18, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "rgba(247, 183, 49, 0.14)";
+  context.beginPath();
+  context.arc(width * 0.88, height * 0.18, width * 0.16, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#071b4d";
+  context.font = "800 26px Arial, sans-serif";
+  context.textBaseline = "top";
+  context.fillText("今日の恋模様", 34, 28);
+}
+
+function drawExportRelations(context) {
+  relations.forEach((relation) => {
+    const from = people.find((person) => person.id === relation.from);
+    const to = people.find((person) => person.id === relation.to);
+    const type = relationTypes.find((item) => item.id === relation.type) || relationTypes[0];
+    if (!from || !to || from.id === to.id) return;
+
+    const geometry = relationGeometry(from, to);
+    context.save();
+    context.strokeStyle = type.color;
+    context.lineWidth = 5;
+    context.lineCap = "round";
+    context.beginPath();
+    context.moveTo(geometry.sx, geometry.sy);
+    context.quadraticCurveTo(geometry.cx, geometry.cy, geometry.ex, geometry.ey);
+    context.stroke();
+    drawArrowHead(context, geometry, type.color);
+    drawExportLabel(context, relation.label || type.label, geometry.cx, geometry.cy - 8);
+    context.restore();
+  });
+}
+
+function drawArrowHead(context, geometry, color) {
+  const angle = Math.atan2(geometry.ey - geometry.cy, geometry.ex - geometry.cx);
+  const size = 13;
+  context.save();
+  context.translate(geometry.ex, geometry.ey);
+  context.rotate(angle);
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(0, 0);
+  context.lineTo(-size, -size * 0.55);
+  context.lineTo(-size, size * 0.55);
+  context.closePath();
+  context.fill();
+  context.restore();
+}
+
+function drawExportLabel(context, label, x, y) {
+  context.font = "800 15px Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.lineJoin = "round";
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 6;
+  context.strokeText(label, x, y);
+  context.fillStyle = "#071b4d";
+  context.fillText(label, x, y);
+}
+
+function drawExportPerson(context, person, image) {
+  const photoX = person.x;
+  const photoY = person.y - 10;
+  context.save();
+  context.fillStyle = "#ffffff";
+  context.shadowColor = "rgba(7, 27, 77, 0.22)";
+  context.shadowBlur = 24;
+  context.shadowOffsetY = 12;
+  context.beginPath();
+  context.arc(photoX, photoY, 60, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.save();
+  context.beginPath();
+  context.arc(photoX, photoY, 54, 0, Math.PI * 2);
+  context.clip();
+  drawImageCover(context, image, photoX - 54, photoY - 54, 108, 108);
+  context.restore();
+
+  drawRoundRect(context, person.x - 58, person.y + 52, 116, 30, 15);
+  context.fillStyle = "#08266d";
+  context.fill();
+  context.fillStyle = "#ffffff";
+  context.font = "800 14px Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(person.name, person.x, person.y + 67, 104);
+}
+
+function drawImageCover(context, image, x, y, width, height) {
+  const ratio = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * ratio;
+  const drawHeight = image.naturalHeight * ratio;
+  const drawX = x + (width - drawWidth) / 2;
+  const drawY = y + (height - drawHeight) / 2;
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
+function drawRoundRect(context, x, y, width, height, radius) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime });
 }
 
 function showExportResult() {
@@ -506,7 +598,7 @@ async function savePngFile() {
         ],
       });
       const writable = await handle.createWritable();
-      await writable.write(latestExportBlob);
+      await writable.write(await latestExportBlob.arrayBuffer());
       await writable.close();
       statusChip.textContent = "PNGを保存しました";
       return;
