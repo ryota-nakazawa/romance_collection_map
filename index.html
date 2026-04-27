@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>恋愛バラエティ相関図メーカー</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="side-panel" aria-label="編集パネル">
+        <header class="brand">
+          <p class="eyebrow">Relationship Map Studio</p>
+          <h1>恋愛バラエティ相関図メーカー</h1>
+        </header>
+
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>出演者</h2>
+            <span id="personCount">0人</span>
+          </div>
+          <label class="upload-area">
+            <input id="imageInput" type="file" accept="image/*" multiple />
+            <span class="upload-icon">＋</span>
+            <span>人物画像を追加</span>
+          </label>
+          <button id="sampleButton" class="ghost-button" type="button">サンプル人物を追加</button>
+          <div id="personList" class="person-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>関係線</h2>
+            <span id="relationCount">0本</span>
+          </div>
+          <div class="relation-form">
+            <label>
+              From
+              <select id="fromSelect"></select>
+            </label>
+            <label>
+              To
+              <select id="toSelect"></select>
+            </label>
+            <label>
+              種類
+              <select id="relationType"></select>
+            </label>
+            <label>
+              ラベル
+              <input id="relationLabel" type="text" placeholder="例: 気になる" />
+            </label>
+            <button id="addRelationButton" class="primary-button" type="button">関係を追加</button>
+          </div>
+          <div id="relationList" class="relation-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-head">
+            <h2>書き出し</h2>
+          </div>
+          <button id="exportPngButton" class="primary-button" type="button">PNGを書き出す</button>
+          <button id="resetButton" class="danger-button" type="button">初期化</button>
+        </section>
+      </aside>
+
+      <section class="workspace" aria-label="相関図キャンバス">
+        <div class="toolbar">
+          <div>
+            <p class="eyebrow">Live Canvas</p>
+            <h2>今日の恋模様</h2>
+          </div>
+          <div class="status-chip" id="statusChip">画像を追加してください</div>
+        </div>
+
+        <div id="mapCanvas" class="map-canvas">
+          <svg id="relationSvg" class="relation-svg" aria-hidden="true"></svg>
+          <div id="emptyState" class="empty-state">
+            <strong>人物画像を入れると、ここに相関図ができます</strong>
+            <span>カードをドラッグして配置し、左側から関係線を追加できます。</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
